@@ -65,7 +65,7 @@ def collect_news():
         try:
             endpoint = (
                 "https://generativelanguage.googleapis.com/"
-                "v1beta/models/gemini-2.5-flash:generateContent?key="
+                "v1beta/models/gemini-3.5-flash-lite:generateContent?key="
                 + urllib.parse.quote(API_KEY, safe="")
             )
 
