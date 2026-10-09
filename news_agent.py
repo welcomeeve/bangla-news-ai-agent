@@ -71,7 +71,7 @@ def make_news(title, description, link):
 
     endpoint = (
         "https://generativelanguage.googleapis.com/"
-        "v1beta/models/gemini-2.5-flash:generateContent?key="
+        "v1beta/models/gemini-3.5-flash-lite:generateContent?key="
         + urllib.parse.quote(GEMINI_API_KEY, safe="")
     )
 
