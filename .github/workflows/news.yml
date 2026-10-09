@@ -22,6 +22,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      
       - name: Collect latest news
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python news_agent.py
         
