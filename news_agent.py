@@ -178,3 +178,30 @@ def collect_news():
 
 if __name__ == "__main__":
     collect_news()
+
+import os
+import json
+import urllib.request
+
+def send_to_a24(headline, image_url):
+    base_url = os.environ["WISPBYTE_URL"].rstrip("/")
+    secret = os.environ["NEWS_API_SECRET"]
+
+    payload = json.dumps({
+        "headline": headline,
+        "image_url": image_url
+    }).encode("utf-8")
+
+    request = urllib.request.Request(
+        base_url + "/news",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "X-News-Secret": secret
+        },
+        method="POST"
+    )
+
+    with urllib.request.urlopen(request, timeout=60) as response:
+        print("A24 response:", response.read().decode("utf-8"))
+        
