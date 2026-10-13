@@ -91,112 +91,13 @@ def make_news(title, description, link):
 
 
 def find_image(item):
-    # RSS-এ সরাসরি ছবি থাকলে সেটি খোঁজার চেষ্টা।
+    # ধাপ ১: RSS-এর মধ্যে ছবি খোঁজা
     for element in item.iter():
         tag = element.tag.lower()
 
-import os
-import json
-import html
-import urllib.request
-import urllib.parse
-import xml.etree.ElementTree as ET
-
-RSS_URL = (
-    "https://news.google.com/rss/search"
-    "?q=Bangladesh&hl=bn&gl=BD&ceid=BD:bn"
-)
-
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-
-WISPBYTE_URL = os.environ.get("WISPBYTE_URL", "").rstrip("/")
-NEWS_API_SECRET = os.environ.get("NEWS_API_SECRET", "")
-
-
-def get_json(url, data=None, headers=None):
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers=headers or {},
-        method="POST" if data else "GET"
-    )
-    with urllib.request.urlopen(req, timeout=60) as response:
-        return json.loads(response.read().decode("utf-8"))
-
-
-def telegram_request(method, fields, photo_url=None):
-    url = (
-        f"https://api.telegram.org/bot"
-        f"{TELEGRAM_BOT_TOKEN}/{method}"
-    )
-
-    fields = dict(fields)
-    if photo_url:
-        fields["photo"] = photo_url
-
-    data = urllib.parse.urlencode(fields).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST"
-    )
-
-    with urllib.request.urlopen(req, timeout=60) as response:
-        result = json.loads(response.read().decode("utf-8"))
-
-    if not result.get("ok"):
-        raise RuntimeError(str(result))
-
-    return result
-
-
-def make_news(title, description, link):
-    prompt = f"""
-তুমি একজন দায়িত্বশীল বাংলা নিউজ সম্পাদক।
-তথ্য বানাবে না, অনিশ্চিত তথ্যকে নিশ্চিত বলে লিখবে না।
-প্রথম লাইনে সংক্ষিপ্ত, আকর্ষণীয় ও সত্যনিষ্ঠ বাংলা শিরোনাম দাও।
-এরপর ২-৪টি বাক্যে খবরটি সংক্ষেপে লেখো।
-শেষে সূত্রের লিংক দাও।
-RSS তথ্যের বাইরে অযাচাইকৃত দাবি যোগ করবে না।
-
-মূল শিরোনাম: {title}
-উৎসের বিবরণ: {description[:1500]}
-মূল লিংক: {link}
-
-শুধু পোস্টের লেখা দাও।
-"""
-
-    endpoint = (
-        "https://generativelanguage.googleapis.com/"
-        "v1beta/models/gemini-3.5-flash-lite:generateContent?key="
-        + urllib.parse.quote(GEMINI_API_KEY, safe="")
-    )
-
-    payload = {
-        "contents": [{
-            "parts": [{"text": prompt}]
-        }]
-    }
-
-    result = get_json(
-        endpoint,
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"}
-    )
-
-    return result["candidates"][0]["content"]["parts"][0]["text"].strip()
-
-
-def find_image(item):
-    for element in item.iter():
-        tag = element.tag.lower()
-
-        if tag.endswith("thumbnail") or tag.endswith("content"):
-            url = element.attrib.get("url", "")
-            image_type = element.attrib.get("type", "")
+        if tag.endswith(("thumbnail", "content")):
+            url = element.attrib.get("url", "").strip()
+            image_type = element.attrib.get("type", "").lower()
 
             if (
                 url.startswith("https://")
@@ -204,7 +105,80 @@ def find_image(item):
             ):
                 return url
 
+    # ধাপ ২: RSS-এ ছবি না থাকলে মূল ওয়েবপেজ থেকে খোঁজা
+    link = item.findtext("link", default="").strip()
+
+    if not link.startswith("https://"):
+        return None
+
+    try:
+        from html.parser import HTMLParser
+        from urllib.parse import urljoin, urlsplit
+
+        class ImageParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.image = None
+
+            def handle_starttag(self, tag, attrs):
+                if tag.lower() != "meta" or self.image:
+                    return
+
+                data = dict(attrs)
+                prop = (
+                    data.get("property", "")
+                    or data.get("name", "")
+                ).lower()
+
+                if prop in ("og:image", "og:image:url", "twitter:image"):
+                    content = data.get("content", "").strip()
+
+                    if content:
+                        self.image = content
+
+        request = urllib.request.Request(
+            link,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; A24NewsBot/1.0)"
+            }
+        )
+
+        with urllib.request.urlopen(request, timeout=15) as response:
+            final_url = response.geturl()
+            host = (urlsplit(final_url).hostname or "").lower()
+
+            # Redirect যেন Google News-এর অন্য URL-এ চলে না যায়
+            if (
+                urlsplit(final_url).scheme != "https"
+                or host == "news.google.com"
+                or host.endswith(".google.com")
+            ):
+                return None
+
+            page = response.read(1_000_000).decode(
+                "utf-8", errors="replace"
+            )
+
+        parser = ImageParser()
+        parser.feed(page)
+
+        if parser.image:
+            image_url = urljoin(final_url, parser.image)
+            parts = urlsplit(image_url)
+
+            if (
+                parts.scheme == "https"
+                and parts.hostname
+                and not parts.username
+                and not parts.password
+            ):
+                return image_url
+
+    except Exception as error:
+        print("ওয়েবপেজ থেকে ছবি পাওয়া যায়নি:", repr(error))
+
     return None
+
 
 
 def send_telegram(text, photo_url=None):
