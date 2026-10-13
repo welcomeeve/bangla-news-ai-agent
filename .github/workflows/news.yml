@@ -21,11 +21,10 @@ jobs:
           python-version: "3.12"
 
       - name: Collect latest news
-        
-    env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      WISPBYTE_URL: ${{ secrets.WISPBYTE_URL }}
-      NEWS_API_SECRET: ${{ secrets.NEWS_API_SECRET }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          WISPBYTE_URL: ${{ secrets.WISPBYTE_URL }}
+          NEWS_API_SECRET: ${{ secrets.NEWS_API_SECRET }}
         run: python news_agent.py
