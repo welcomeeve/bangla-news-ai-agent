@@ -215,11 +215,9 @@ def send_to_a24(headline, image_url):
         print("A24 বাদ: WISPBYTE_URL বা NEWS_API_SECRET নেই")
         return
 
-    if not image_url:
-        print("A24 বাদ: নিউজের সরাসরি HTTPS ছবি পাওয়া যায়নি")
-        return
 
-    if not image_url.startswith("https://"):
+
+    if image_url and not image_url.startswith("https://"):
         print("A24 বাদ: ছবির URL HTTPS নয়")
         return
 
