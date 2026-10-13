@@ -14,6 +14,8 @@ RSS_URL = (
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+WISPBYTE_URL = os.environ.get("WISPBYTE_URL", "").rstrip("/")
+NEWS_API_SECRET = os.environ.get("NEWS_API_SECRET", "")
 
 
 def get_json(url, data=None, headers=None):
