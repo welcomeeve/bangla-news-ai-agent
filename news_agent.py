@@ -95,14 +95,115 @@ def find_image(item):
     for element in item.iter():
         tag = element.tag.lower()
 
+import os
+import json
+import html
+import urllib.request
+import urllib.parse
+import xml.etree.ElementTree as ET
+
+RSS_URL = (
+    "https://news.google.com/rss/search"
+    "?q=Bangladesh&hl=bn&gl=BD&ceid=BD:bn"
+)
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+WISPBYTE_URL = os.environ.get("WISPBYTE_URL", "").rstrip("/")
+NEWS_API_SECRET = os.environ.get("NEWS_API_SECRET", "")
+
+
+def get_json(url, data=None, headers=None):
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers=headers or {},
+        method="POST" if data else "GET"
+    )
+    with urllib.request.urlopen(req, timeout=60) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def telegram_request(method, fields, photo_url=None):
+    url = (
+        f"https://api.telegram.org/bot"
+        f"{TELEGRAM_BOT_TOKEN}/{method}"
+    )
+
+    fields = dict(fields)
+    if photo_url:
+        fields["photo"] = photo_url
+
+    data = urllib.parse.urlencode(fields).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST"
+    )
+
+    with urllib.request.urlopen(req, timeout=60) as response:
+        result = json.loads(response.read().decode("utf-8"))
+
+    if not result.get("ok"):
+        raise RuntimeError(str(result))
+
+    return result
+
+
+def make_news(title, description, link):
+    prompt = f"""
+তুমি একজন দায়িত্বশীল বাংলা নিউজ সম্পাদক।
+তথ্য বানাবে না, অনিশ্চিত তথ্যকে নিশ্চিত বলে লিখবে না।
+প্রথম লাইনে সংক্ষিপ্ত, আকর্ষণীয় ও সত্যনিষ্ঠ বাংলা শিরোনাম দাও।
+এরপর ২-৪টি বাক্যে খবরটি সংক্ষেপে লেখো।
+শেষে সূত্রের লিংক দাও।
+RSS তথ্যের বাইরে অযাচাইকৃত দাবি যোগ করবে না।
+
+মূল শিরোনাম: {title}
+উৎসের বিবরণ: {description[:1500]}
+মূল লিংক: {link}
+
+শুধু পোস্টের লেখা দাও।
+"""
+
+    endpoint = (
+        "https://generativelanguage.googleapis.com/"
+        "v1beta/models/gemini-3.5-flash-lite:generateContent?key="
+        + urllib.parse.quote(GEMINI_API_KEY, safe="")
+    )
+
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
+
+    result = get_json(
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+
+    return result["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+
+def find_image(item):
+    for element in item.iter():
+        tag = element.tag.lower()
+
         if tag.endswith("thumbnail") or tag.endswith("content"):
             url = element.attrib.get("url", "")
-            if url.startswith("https://") or url.startswith("http://"):
-                image_type = element.attrib.get("type", "")
-                if not image_type or image_type.startswith("image/"):
-                    return url
+            image_type = element.attrib.get("type", "")
 
-    # ছবি না থাকলে কোনো অনুমানভিত্তিক URL তৈরি করা হবে না।
+            if (
+                url.startswith("https://")
+                and (not image_type or image_type.startswith("image/"))
+            ):
+                return url
+
     return None
 
 
@@ -110,7 +211,6 @@ def send_telegram(text, photo_url=None):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         raise RuntimeError("Telegram secrets পাওয়া যায়নি")
 
-    # Telegram caption-এর সীমা এড়াতে লেখা আলাদা মেসেজে পাঠানো।
     if photo_url:
         try:
             telegram_request(
@@ -122,7 +222,7 @@ def send_telegram(text, photo_url=None):
                 photo_url=photo_url
             )
         except Exception as error:
-            print(f"ছবি পাঠানো যায়নি: {error}")
+            print("Telegram-এ ছবি পাঠানো যায়নি:", repr(error))
 
     telegram_request(
         "sendMessage",
@@ -132,6 +232,39 @@ def send_telegram(text, photo_url=None):
             "disable_web_page_preview": "false"
         }
     )
+
+
+def send_to_a24(headline, image_url):
+    if not WISPBYTE_URL or not NEWS_API_SECRET:
+        print("A24 বাদ: WISPBYTE_URL বা NEWS_API_SECRET নেই")
+        return
+
+    if not image_url:
+        print("A24 বাদ: নিউজের সরাসরি HTTPS ছবি পাওয়া যায়নি")
+        return
+
+    if not image_url.startswith("https://"):
+        print("A24 বাদ: ছবির URL HTTPS নয়")
+        return
+
+    payload = json.dumps({
+        "headline": headline[:500],
+        "image_url": image_url
+    }).encode("utf-8")
+
+    request = urllib.request.Request(
+        WISPBYTE_URL + "/news",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "X-News-Secret": NEWS_API_SECRET
+        },
+        method="POST"
+    )
+
+    with urllib.request.urlopen(request, timeout=90) as response:
+        result = response.read().decode("utf-8")
+        print("A24 response:", result)
 
 
 def collect_news():
@@ -159,7 +292,7 @@ def collect_news():
             continue
 
         seen.add(link)
-        print(f"নিউজ: {title}")
+        print("নিউজ:", title)
 
         if not GEMINI_API_KEY:
             print("GEMINI_API_KEY পাওয়া যায়নি")
@@ -169,39 +302,22 @@ def collect_news():
             news_text = make_news(title, description, link)
             photo_url = find_image(item)
 
+            # আগের Telegram নিউজ ব্যবস্থা বজায় থাকবে
             send_telegram(news_text, photo_url)
             print("Telegram-এ নিউজ পাঠানো হয়েছে")
 
+            # প্রথম লাইনের শিরোনাম দিয়ে A24 কার্ড তৈরি
+            headline = news_text.splitlines()[0].strip()
+            headline = headline.lstrip("#* ").strip()
+
+            try:
+                send_to_a24(headline, photo_url)
+            except Exception as error:
+                print("A24-তে পাঠানো যায়নি:", repr(error))
+
         except Exception as error:
-            print(f"সমস্যা হয়েছে: {error}")
+            print("নিউজ প্রসেসিংয়ে সমস্যা:", repr(error))
 
 
 if __name__ == "__main__":
     collect_news()
-
-import os
-import json
-import urllib.request
-
-def send_to_a24(headline, image_url):
-    base_url = os.environ["WISPBYTE_URL"].rstrip("/")
-    secret = os.environ["NEWS_API_SECRET"]
-
-    payload = json.dumps({
-        "headline": headline,
-        "image_url": image_url
-    }).encode("utf-8")
-
-    request = urllib.request.Request(
-        base_url + "/news",
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "X-News-Secret": secret
-        },
-        method="POST"
-    )
-
-    with urllib.request.urlopen(request, timeout=60) as response:
-        print("A24 response:", response.read().decode("utf-8"))
-        
