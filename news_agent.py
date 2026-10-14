@@ -287,9 +287,16 @@ def collect_news():
             headline = headline.lstrip("#* ").strip()
 
             try:
-                send_to_a24(headline, photo_url)
-            except Exception as error:
-                print("A24-তে পাঠানো যায়নি:", repr(error))
+    with urllib.request.urlopen(request, timeout=90) as response:
+        result = response.read().decode("utf-8")
+        print("A24 response:", result)
+except urllib.error.HTTPError as error:
+    print(
+        "A24 HTTP Error:",
+        error.code,
+        error.read().decode("utf-8", errors="replace")
+    )
+    raise
 
         except Exception as error:
             print("নিউজ প্রসেসিংয়ে সমস্যা:", repr(error))
