@@ -224,6 +224,7 @@ def send_to_a24(headline, image_url):
         "image_url": image_url
     }).encode("utf-8")
 
+    
     request = urllib.request.Request(
         WISPBYTE_URL.rstrip("/") + "/news",
         data=payload,
@@ -233,6 +234,7 @@ def send_to_a24(headline, image_url):
         },
         method="POST"
     )
+
 
     try:
         with urllib.request.urlopen(request, timeout=90) as response:
