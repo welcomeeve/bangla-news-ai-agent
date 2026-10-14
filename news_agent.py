@@ -308,7 +308,7 @@ def collect_news():
                 data=data,
                 headers={
                     "Content-Type": "application/json",
-                    "X-News-Secret": WISPBYTE_SECRET
+                    "X-News-Secret": NEWS_API_SECRET
                 },
                 method="POST"
             )
