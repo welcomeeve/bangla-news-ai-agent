@@ -282,12 +282,27 @@ def collect_news():
             send_telegram(news_text, photo_url)
             print("Telegram-এ নিউজ পাঠানো হয়েছে")
 
+            
             # প্রথম লাইনের শিরোনাম দিয়ে A24 কার্ড তৈরি
             headline = news_text.splitlines()[0].strip()
             headline = headline.lstrip("#* ").strip()
 
-           
-        try:
+            # A24-তে পাঠানোর অনুরোধ
+            payload = {
+                "headline": headline,
+                "image_url": photo_url
+            }
+            data = json.dumps(payload).encode("utf-8")
+            request = urllib.request.Request(
+                WISPBYTE_URL.rstrip("/") + "/news",
+                data=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-News-Secret": WISPBYTE_SECRET
+                },
+                method="POST"
+            )
+
             with urllib.request.urlopen(request, timeout=90) as response:
                 result = response.read().decode("utf-8")
                 print("A24 response:", result)
@@ -298,12 +313,10 @@ def collect_news():
                 error.code,
                 error.read().decode("utf-8", errors="replace")
             )
-            raise
 
-    except Exception as error:
-        print("নিউজ প্রসেসিংয়ে সমস্যা:", repr(error))
+        except Exception as error:
+            print("নিউজ প্রসেসিংয়ে সমস্যা:", repr(error))
 
 
 if __name__ == "__main__":
     collect_news()
-```
