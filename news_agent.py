@@ -286,21 +286,24 @@ def collect_news():
             headline = news_text.splitlines()[0].strip()
             headline = headline.lstrip("#* ").strip()
 
-            try:
-    with urllib.request.urlopen(request, timeout=90) as response:
-        result = response.read().decode("utf-8")
-        print("A24 response:", result)
-except urllib.error.HTTPError as error:
-    print(
-        "A24 HTTP Error:",
-        error.code,
-        error.read().decode("utf-8", errors="replace")
-    )
-    raise
+           ```python
+        try:
+            with urllib.request.urlopen(request, timeout=90) as response:
+                result = response.read().decode("utf-8")
+                print("A24 response:", result)
 
-        except Exception as error:
-            print("নিউজ প্রসেসিংয়ে সমস্যা:", repr(error))
+        except urllib.error.HTTPError as error:
+            print(
+                "A24 HTTP Error:",
+                error.code,
+                error.read().decode("utf-8", errors="replace")
+            )
+            raise
+
+    except Exception as error:
+        print("নিউজ প্রসেসিংয়ে সমস্যা:", repr(error))
 
 
 if __name__ == "__main__":
     collect_news()
+```
