@@ -286,7 +286,7 @@ def collect_news():
             headline = news_text.splitlines()[0].strip()
             headline = headline.lstrip("#* ").strip()
 
-           ```python
+           
         try:
             with urllib.request.urlopen(request, timeout=90) as response:
                 result = response.read().decode("utf-8")
