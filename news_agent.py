@@ -208,20 +208,16 @@ def send_telegram(text, photo_url=None):
             "disable_web_page_preview": "false"
         }
     )
-
-
 def send_to_a24(headline, image_url):
     if not WISPBYTE_URL or not NEWS_API_SECRET:
         print("A24 বাদ: WISPBYTE_URL বা NEWS_API_SECRET নেই")
         return
 
-
-
     image_url = (image_url or "").strip()
 
-if image_url and not image_url.startswith("https://"):
-    print("A24 বাদ: ছবির URL HTTPS নয়")
-    image_url = ""
+    if image_url and not image_url.startswith("https://"):
+        print("A24 বাদ: ছবির URL HTTPS নয়")
+        image_url = ""
 
     payload = json.dumps({
         "headline": headline[:500],
@@ -229,7 +225,7 @@ if image_url and not image_url.startswith("https://"):
     }).encode("utf-8")
 
     request = urllib.request.Request(
-        WISPBYTE_URL + "/news",
+        WISPBYTE_URL.rstrip("/") + "/news",
         data=payload,
         headers={
             "Content-Type": "application/json",
@@ -238,9 +234,21 @@ if image_url and not image_url.startswith("https://"):
         method="POST"
     )
 
-    with urllib.request.urlopen(request, timeout=90) as response:
-        result = response.read().decode("utf-8")
-        print("A24 response:", result)
+    try:
+        with urllib.request.urlopen(request, timeout=90) as response:
+            result = response.read().decode("utf-8")
+            print("A24 response:", result)
+
+    except urllib.error.HTTPError as error:
+        print(
+            "A24 HTTP Error:",
+            error.code,
+            error.read().decode("utf-8", errors="replace")
+        )
+
+    except Exception as error:
+        print("A24-তে পাঠানো যায়নি:", repr(error))
+
 
 
 def collect_news():
