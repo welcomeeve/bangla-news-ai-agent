@@ -217,9 +217,11 @@ def send_to_a24(headline, image_url):
 
 
 
-    if image_url and not image_url.startswith("https://"):
-        print("A24 বাদ: ছবির URL HTTPS নয়")
-        return
+    image_url = (image_url or "").strip()
+
+if image_url and not image_url.startswith("https://"):
+    print("A24 বাদ: ছবির URL HTTPS নয়")
+    image_url = ""
 
     payload = json.dumps({
         "headline": headline[:500],
